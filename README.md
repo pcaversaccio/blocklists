@@ -15,15 +15,44 @@ options:
                         comma-separated list of domains to check (e.g., "https://domain1.com,https://domain2.com")
 ```
 
-## Usage
+## Prerequisites
 
-First, install the required packages:
+- Python `>=3.6`
+- API keys for the blocklist service providers
+
+1. Clone this repository:
+
+```console
+git clone https://github.com/pcaversaccio/blocklists.git
+cd blocklists
+```
+
+2. Create a virtual environment (optional but recommended):
+
+```console
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`.
+```
+
+3. Install the required packages:
 
 ```console
 pip install -r requirements.txt
 ```
 
-**Example:**
+4. Create a `.env` file in the project root and add your API keys for the blocklist service providers:
+
+```txt
+BLOWFISH_API_KEY="YOUR_BLOWFISH_API_KEY"
+CHAINPATROL_API_KEY="YOUR_CHAINPATROL_API_KEY"
+```
+
+> [!CAUTION]
+> Make sure to keep your `.env` file secure and _never_ commit it to version control!
+
+## Usage
+
+Run the script using Python:
 
 ```console
 python scripts/blocklist.py --domains "https://walietconnect.events,https://ethena.fi"
