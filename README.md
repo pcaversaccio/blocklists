@@ -2,7 +2,7 @@
 
 A Python script [`check_blocklist_domains.py`](./scripts/check_blocklist_domains.py) designed to retrieve comprehensive domain status reports from multiple blocklist providers.
 
-```py
+```console
 python scripts/check_blocklist_domains.py
 ```
 
