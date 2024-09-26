@@ -45,6 +45,8 @@ pip install -r requirements.txt
 ```txt
 BLOWFISH_API_KEY="YOUR_BLOWFISH_API_KEY"
 CHAINPATROL_API_KEY="YOUR_CHAINPATROL_API_KEY"
+SCAMSNIFFER_IDENTIFIER="YOUR_SCAMSNIFFER_IDENTIFIER"
+SCAMSNIFFER_API_KEY="YOUR_SCAMSNIFFER_API_KEY"
 ```
 
 > [!CAUTION]
@@ -55,10 +57,11 @@ CHAINPATROL_API_KEY="YOUR_CHAINPATROL_API_KEY"
 Run the script using Python:
 
 ```console
-python scripts/blocklist.py --domains "https://walietconnect.events,https://ethena.fi"
+python scripts/blocklist.py --domains "https://walietconnect.events,https://ethena.fi,https://docs.vyperlang.org/en/stable/"
 ```
 
 ## Supported Blocklist Providers
 
 - [Blowfish](https://blowfish.xyz)
 - [ChainPatrol](https://chainpatrol.io)
+- [Scam Sniffer](https://www.scamsniffer.io)
