@@ -47,6 +47,7 @@ BLOWFISH_API_KEY="YOUR_BLOWFISH_API_KEY"
 CHAINPATROL_API_KEY="YOUR_CHAINPATROL_API_KEY"
 SCAMSNIFFER_IDENTIFIER="YOUR_SCAMSNIFFER_IDENTIFIER"
 SCAMSNIFFER_API_KEY="YOUR_SCAMSNIFFER_API_KEY"
+SEAL_ISAC_API_KEY="YOUR_SEAL_ISAC_API_KEY" 
 ```
 
 > [!CAUTION]
@@ -65,3 +66,5 @@ python scripts/blocklist.py --domains "https://walietconnect.events,https://ethe
 - [Blowfish](https://blowfish.xyz)
 - [ChainPatrol](https://chainpatrol.io)
 - [Scam Sniffer](https://www.scamsniffer.io)
+- [MetaMask](https://github.com/MetaMask/eth-phishing-detect)
+- [SEAL-ISAC](https://isac.securityalliance.org)
