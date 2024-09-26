@@ -131,7 +131,7 @@ def check_seal_isac_blacklist(domain):
                 return True
         return False
     except Exception as e:
-        print(f"{RED}Failed to query OpenCTI: {str(e)}{RESET}")
+        print(f"{RED}Failed to query SEAL-ISAC: {str(e)}{RESET}")
         return False
 
 
@@ -165,7 +165,7 @@ def main():
         status = domain_info.get("status", "Unknown status")
         risk_score = domain_info.get("riskScore", "No risk score")
 
-        # Check if the risk score is >= 0.5 and print in red if true.
+        # Check if the risk score is `>= 0.5` and print in red if true.
         if isinstance(risk_score, (int, float)) and risk_score >= 0.5:
             risk_score_output = f"{RED}{risk_score}{RESET}"
         else:
