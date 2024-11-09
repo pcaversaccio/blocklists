@@ -62,8 +62,7 @@ def send_blowfish_request(domains):
 # Helper function to send the ChainPatrol request (one domain at a time).
 def send_chainpatrol_request(domain):
     # Extract the hostname from the domain.
-    parsed_url = urlparse(domain)
-    hostname = parsed_url.hostname.lower()
+    hostname = urlparse(domain).hostname.lower()
     payload_chainpatrol = {"content": hostname}
     headers_chainpatrol = get_headers("CHAINPATROL_API_KEY")
     response_chainpatrol = requests.post(
@@ -75,8 +74,7 @@ def send_chainpatrol_request(domain):
 # Helper function to send the Scam Sniffer request (one domain at a time).
 def send_scamsniffer_request(domain):
     # Extract the hostname from the domain.
-    parsed_url = urlparse(domain)
-    hostname = parsed_url.hostname.lower()
+    hostname = urlparse(domain).hostname.lower()
     url_scamsniffer = f"{URL_SCAMSNIFFER}?url={hostname}"
     headers_scamsniffer = {
         "Accept": "*/*",
