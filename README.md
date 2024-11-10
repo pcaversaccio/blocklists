@@ -12,7 +12,7 @@ Check domains against all supported blocklist provider APIs.
 options:
   -h, --help            show this help message and exit
   -d DOMAINS, --domains DOMAINS
-                        comma-separated list of domains to check (e.g., "https://domain1.com,https://domain2.com")
+                        comma-separated list of domains to check (e.g., "https://domain1.com,www.domain2.com,app.domain2.com")
 ```
 
 ## Prerequisites
@@ -58,7 +58,7 @@ SEAL_ISAC_API_KEY="YOUR_SEAL_ISAC_API_KEY"
 Run the script using Python:
 
 ```console
-python scripts/blocklist.py --domains "https://walietconnect.events,https://ethena.fi,https://docs.vyperlang.org/en/stable/"
+python scripts/blocklist.py --domains "walietconnect.events,www.kyberswap.org,https://ethena.fi,docs.vyperlang.org/en/stable"
 ```
 
 ## Supported Blocklist Providers
