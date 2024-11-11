@@ -62,11 +62,17 @@ class DomainChecker:
     def __init__(self):
         self.metamask_blacklist = None
 
-    def normalise_domain(self, domain: str) -> str:
+    def normalise_domain(self, domain: str, include_scheme: bool = False) -> str:
         """Normalises a domain by ensuring a proper format and lower case."""
-        if not domain.startswith(("http://", "https://")):
-            domain = f"https://{domain}"
-        return urlparse(domain).hostname.lower()
+        parsed = urlparse(
+            domain
+            if domain.startswith(("http://", "https://"))
+            else f"https://{domain}"
+        )
+        if parsed.hostname is None:
+            raise ValueError(f"Invalid domain: '{domain}'")
+        hostname = parsed.hostname.lower()
+        return f"https://{hostname}" if include_scheme else hostname
 
     def get_headers(
         self, api_key_env: str, version: Optional[str] = None
@@ -83,7 +89,7 @@ class DomainChecker:
     def check_blowfish(self, domains: List[str]) -> List[DomainCheck]:
         """Checks the domains against the Blowfish API."""
         try:
-            hostnames = [self.normalise_domain(domain) for domain in domains]
+            hostnames = [self.normalise_domain(domain, True) for domain in domains]
             response = requests.post(
                 APIEndpoints.BLOWFISH,
                 json={"domains": hostnames},
