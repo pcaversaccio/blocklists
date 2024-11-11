@@ -1,4 +1,7 @@
-# References:
+#!/usr/bin/env python
+
+# API References:
+# ---------------
 # - Blowfish: https://docs.blowfish.xyz/reference/scan-domain-1,
 # - ChainPatrol: https://chainpatrol.io/docs/external-api/asset-check,
 # - Scam Sniffer: https://docs.scamsniffer.io/reference/getsitecheck,
@@ -7,6 +10,8 @@
 
 import os, requests, argparse, urllib3, logging
 from urllib.parse import urlparse
+from dataclasses import dataclass
+from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from pycti import OpenCTIApiClient
 
@@ -19,124 +24,221 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Set the root logger's level to "WARNING" to suppress "INFO" logs globally.
 logging.basicConfig(level=logging.WARNING)
-# Set logging level for `pycti` to "WARNING" to suppress "INFO" logs specifically.
+# Set the logging level for `pycti` to "WARNING" to suppress "INFO" logs specifically.
 logging.getLogger("pycti").setLevel(logging.WARNING)
 
 
-# ANSI escape codes for the colours.
-GREEN = "\033[92m"
-RED = "\033[91m"
-RESET = "\033[0m"
+class Colours:
+    """Sets the ANSI escape codes for the colours."""
 
-# Specify the API endpoints for the blocklist service providers.
-URL_BLOWFISH = "https://api.blowfish.xyz/v0/domains"
-URL_CHAINPATROL = "https://app.chainpatrol.io/api/v2/asset/check"
-URL_SCAMSNIFFER = "https://lookup-api.scamsniffer.io/site/check"
-URL_METAMASK = "https://raw.githubusercontent.com/MetaMask/eth-phishing-detect/refs/heads/main/src/config.json"
-URL_SEAL_ISAC = "https://sealisac.org"
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    RESET = "\033[0m"
 
 
-# Helper function to construct the request headers for the API calls.
-def get_headers(api_key_env, version=None):
-    headers = {
-        "Content-Type": "application/json",
-        "X-Api-Key": os.getenv(api_key_env),
-    }
-    if version:
-        headers["X-Api-Version"] = version
-    return headers
+class APIEndpoints:
+    """Sets the API endpoints for the blocklist service providers."""
+
+    BLOWFISH = "https://api.blowfish.xyz/v0/domains"
+    CHAINPATROL = "https://app.chainpatrol.io/api/v2/asset/check"
+    SCAMSNIFFER = "https://lookup-api.scamsniffer.io/site/check"
+    METAMASK = "https://raw.githubusercontent.com/MetaMask/eth-phishing-detect/refs/heads/main/src/config.json"
+    SEAL_ISAC = "https://sealisac.org"
 
 
-# Helper function to send the Blowfish request.
-def send_blowfish_request(domains):
-    # Extract the host names from the domains.
-    hostnames = ["https://" + urlparse(domain).hostname.lower() for domain in domains]
-    payload_blowfish = {"domains": hostnames}
-    headers_blowfish = get_headers("BLOWFISH_API_KEY", "2023-06-05")
-    response_blowfish = requests.post(
-        URL_BLOWFISH, json=payload_blowfish, headers=headers_blowfish
-    )
-    return response_blowfish
+@dataclass
+class DomainCheck:
+    """Represents the result of a domain check."""
+
+    domain: str
+    status: str
+    risk_score: Optional[float] = None
+    error: Optional[str] = None
 
 
-# Helper function to send the ChainPatrol request (one domain at a time).
-def send_chainpatrol_request(domain):
-    # Extract the hostname from the domain.
-    parsed_url = urlparse(domain)
-    hostname = parsed_url.hostname.lower()
-    payload_chainpatrol = {"content": hostname}
-    headers_chainpatrol = get_headers("CHAINPATROL_API_KEY")
-    response_chainpatrol = requests.post(
-        URL_CHAINPATROL, json=payload_chainpatrol, headers=headers_chainpatrol
-    )
-    return response_chainpatrol
+class DomainChecker:
+    """Handles all domain checks."""
 
+    def __init__(self):
+        self.metamask_blacklist = None
 
-# Helper function to send the Scam Sniffer request (one domain at a time).
-def send_scamsniffer_request(domain):
-    # Extract the hostname from the domain.
-    parsed_url = urlparse(domain)
-    hostname = parsed_url.hostname.lower()
-    url_scamsniffer = f"{URL_SCAMSNIFFER}?url={hostname}"
-    headers_scamsniffer = {
-        "Accept": "*/*",
-        "X-Api-Key": os.getenv("SCAMSNIFFER_API_KEY"),
-    }
-    response_scamsniffer = requests.get(url_scamsniffer, headers=headers_scamsniffer)
-    return response_scamsniffer
+    def normalise_domain(self, domain: str, include_scheme: bool = False) -> str:
+        """Normalises a domain by ensuring a proper format and lower case."""
+        parsed = urlparse(
+            domain
+            if domain.startswith(("http://", "https://"))
+            else f"https://{domain}"
+        )
+        if parsed.hostname is None:
+            raise ValueError(f"Invalid domain: '{domain}'")
+        # The Python function `urlparse` ensures that the hostname is in lower case.
+        # See: https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlparse.
+        hostname = parsed.hostname
+        return f"https://{hostname}" if include_scheme else hostname
 
-
-# Helper function to check the MetaMask blacklist.
-def check_metamask_blacklist(domain):
-    response = requests.get(URL_METAMASK)
-    blacklist = response.json().get("blacklist", [])
-    domain_hostname = urlparse(domain).hostname.lower()
-    return domain_hostname in blacklist
-
-
-# Helper function to check the SEAL-ISAC blacklist.
-def check_seal_isac_blacklist(domain):
-    opencti_api_client = OpenCTIApiClient(
-        url=URL_SEAL_ISAC, token=os.getenv("SEAL_ISAC_API_KEY"), ssl_verify=False
-    )
-    domain_hostname = urlparse(domain).hostname.lower()
-    try:
-        query = """
-        query DomainObservables($domain: String!) {
-          stixCyberObservables(search: $domain) {
-            edges {
-              node {
-                id
-                entity_type
-                objectLabel {
-                  value
-                }
-                observable_value
-              }
-            }
-          }
+    def get_headers(
+        self, api_key_env: str, version: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Constructs the headers for the API requests."""
+        headers = {
+            "Content-Type": "application/json",
+            "X-Api-Key": os.getenv(api_key_env),
         }
-        """
-        variables = {"domain": domain_hostname}
-        result = opencti_api_client.query(query, variables)
-        observables = result["data"]["stixCyberObservables"]["edges"]
+        if version:
+            headers["X-Api-Version"] = version
+        return headers
 
-        # Check if any observable has "blocklisted domain" as the `objectLabel` value.
-        for obs in observables:
-            observable_value = obs["node"].get("observable_value", "").lower()
-            labels = obs["node"].get("objectLabel", [])
-            if observable_value == domain_hostname and any(
-                label["value"] == "blocklisted domain" for label in labels
-            ):
-                return True
-        return False
-    except Exception as e:
-        print(f"{RED}Failed to query SEAL-ISAC: {str(e)}{RESET}")
-        return False
+    def check_blowfish(self, domains: List[str]) -> List[DomainCheck]:
+        """Checks the domains against the Blowfish API."""
+        try:
+            hostnames = [self.normalise_domain(domain, True) for domain in domains]
+            response = requests.post(
+                APIEndpoints.BLOWFISH,
+                json={"domains": hostnames},
+                headers=self.get_headers("BLOWFISH_API_KEY", "2023-06-05"),
+            )
+            response.raise_for_status()
+            results = []
+            for domain_info in response.json():
+                results.append(
+                    DomainCheck(
+                        domain=domain_info.get("domain", "Unknown domain"),
+                        status=domain_info.get("status", "Unknown status"),
+                        risk_score=domain_info.get("riskScore", "No risk score"),
+                    )
+                )
+            return results
+        except Exception as e:
+            return [
+                DomainCheck(domain=d, status="ERROR", error=str(e)) for d in domains
+            ]
+
+    def check_chainpatrol(self, domain: str) -> DomainCheck:
+        """Checks the domain against the ChainPatrol API."""
+        try:
+            hostname = self.normalise_domain(domain)
+            response = requests.post(
+                APIEndpoints.CHAINPATROL,
+                json={"content": hostname},
+                headers=self.get_headers("CHAINPATROL_API_KEY"),
+            )
+            response.raise_for_status()
+            return DomainCheck(
+                domain=hostname,
+                status=response.json().get("status", "Unknown status"),
+            )
+        except Exception as e:
+            return DomainCheck(domain=hostname, status="ERROR", error=str(e))
+
+    def check_scamsniffer(self, domain: str) -> DomainCheck:
+        """Checks the domain against the Scam Sniffer API."""
+        try:
+            hostname = self.normalise_domain(domain)
+            response = requests.get(
+                f"{APIEndpoints.SCAMSNIFFER}?url={hostname}",
+                headers={
+                    "Accept": "*/*",
+                    "X-Api-Key": os.getenv("SCAMSNIFFER_API_KEY"),
+                },
+            )
+            response.raise_for_status()
+            return DomainCheck(
+                domain=hostname,
+                status=response.json().get("status", "Unknown status"),
+            )
+        except Exception as e:
+            return DomainCheck(domain=hostname, status="ERROR", error=str(e))
+
+    def check_metamask(self, domain: str) -> DomainCheck:
+        """Checks the domain against the MetaMask blacklist."""
+        try:
+            hostname = self.normalise_domain(domain)
+            if not self.metamask_blacklist:
+                response = requests.get(APIEndpoints.METAMASK)
+                response.raise_for_status()
+                self.metamask_blacklist = set(response.json().get("blacklist", []))
+
+            status = "BLOCKED" if hostname in self.metamask_blacklist else "ALLOWED"
+            return DomainCheck(domain=hostname, status=status)
+        except Exception as e:
+            return DomainCheck(domain=hostname, status="ERROR", error=str(e))
+
+    def check_seal_isac(self, domain: str) -> DomainCheck:
+        """Checks the domain against the SEAL-ISAC blacklist."""
+        try:
+            hostname = self.normalise_domain(domain)
+            client = OpenCTIApiClient(
+                url=APIEndpoints.SEAL_ISAC,
+                token=os.getenv("SEAL_ISAC_API_KEY"),
+                ssl_verify=False,
+            )
+
+            query = """
+            query DomainObservables($domain: String!) {
+                stixCyberObservables(search: $domain) {
+                    edges {
+                        node {
+                            observable_value
+                            objectLabel {
+                                value
+                            }
+                        }
+                    }
+                }
+            }
+            """
+
+            result = client.query(query, {"domain": hostname})
+            observables = result["data"]["stixCyberObservables"]["edges"]
+
+            is_blacklisted = any(
+                obs["node"].get("observable_value", "").lower() == hostname
+                # Checks if any observable has "blocklisted domain" as the `objectLabel` value.
+                and any(
+                    label["value"] == "blocklisted domain"
+                    for label in obs["node"].get("objectLabel", [])
+                )
+                for obs in observables
+            )
+
+            status = "BLOCKED" if is_blacklisted else "ALLOWED"
+            return DomainCheck(domain=hostname, status=status)
+        except Exception as e:
+            return DomainCheck(domain=hostname, status="ERROR", error=str(e))
 
 
-# Command-line argument parsing.
+def print_results(title: str, results: List[DomainCheck]):
+    """Prints the results in a consistent format."""
+    print(f"{Colours.GREEN}{title}:{Colours.RESET}\n{'-' * (len(title) + 1)}")
+    for result in results:
+        status_output = (
+            f"{Colours.RED}{result.status}{Colours.RESET}"
+            if result.status in ["BLOCKED", "ERROR"]
+            else result.status
+        )
+
+        print(f"Domain: {result.domain}")
+        if result.risk_score is not None:
+            # Checks if the risk score is `>= 0.5` and prints in red if true.
+            risk_score_output = (
+                f"{Colours.RED}{str(result.risk_score)}{Colours.RESET}"
+                if result.risk_score >= 0.5
+                else str(result.risk_score)
+            )
+            print(f"Risk Score: {risk_score_output}")
+            status_output = (
+                f"{Colours.RED}BLOCKED{Colours.RESET}"
+                if result.risk_score >= 0.5
+                else status_output
+            )
+        print(f"Status: {status_output}")
+        if result.error:
+            print(f"Error: {Colours.RED}{result.error}{Colours.RESET}")
+        print()
+
+
 def parse_args():
+    """Parses the command line arguments."""
     parser = argparse.ArgumentParser(
         description="Check domains against all supported blocklist provider APIs."
     )
@@ -144,121 +246,29 @@ def parse_args():
         "-d",
         "--domains",
         required=True,
-        help='comma-separated list of domains to check (e.g., "https://domain1.com,https://domain2.com")',
+        help='comma-separated list of domains to check (e.g., "https://domain1.com,www.domain2.com,app.domain2.com")',
     )
     return parser.parse_args()
 
 
-def main():
+def check():
+    """Runs all domain checks."""
     args = parse_args()
     domains = [domain.strip() for domain in args.domains.split(",")]
+    checker = DomainChecker()
 
-    # Send the Blowfish API call.
-    blowfish_response = send_blowfish_request(domains)
-    blowfish_data = blowfish_response.json()
+    blowfish_results = checker.check_blowfish(domains)
+    chainpatrol_results = [checker.check_chainpatrol(domain) for domain in domains]
+    scamsniffer_results = [checker.check_scamsniffer(domain) for domain in domains]
+    metamask_results = [checker.check_metamask(domain) for domain in domains]
+    seal_isac_results = [checker.check_seal_isac(domain) for domain in domains]
 
-    print(f"{GREEN}Blowfish Results:{RESET}\n-----------------")
-
-    # Loop through the response and print the domain name and risk score.
-    for domain_info in blowfish_data:
-        domain = domain_info.get("domain", "Unknown domain")
-        status = domain_info.get("status", "Unknown status")
-        risk_score = domain_info.get("riskScore", "No risk score")
-
-        # Check if the risk score is `>= 0.5` and print in red if true.
-        if isinstance(risk_score, (int, float)) and risk_score >= 0.5:
-            risk_score_output = f"{RED}{risk_score}{RESET}"
-        else:
-            risk_score_output = risk_score
-
-        # Print the status. If it's "BLOCKED", print in red.
-        if status == "BLOCKED":
-            status_output = f"{RED}{status}{RESET}"
-        else:
-            status_output = status
-
-        # Check if the domain is processed.
-        if status == "PROCESSED":
-            print(f"Domain: {domain}\nRisk Score: {risk_score_output}\n")
-        else:
-            print(f"Domain: {domain}\nStatus: {status_output}\n")
-
-    chainpatrol_results = []
-    scamsniffer_results = []
-    metamask_results = []
-    seal_isac_results = []
-
-    for domain in domains:
-        domain_hostname = urlparse(domain).hostname.lower()
-
-        # Send the ChainPatrol API call (one request per domain).
-        chainpatrol_response = send_chainpatrol_request(domain)
-        chainpatrol_status = chainpatrol_response.json().get(
-            "status", "Status not found"
-        )
-
-        # Store the ChainPatrol result.
-        chainpatrol_results.append((domain_hostname, chainpatrol_status))
-
-        # Send the Scam Sniffer API call for each domain.
-        scamsniffer_response = send_scamsniffer_request(domain)
-        scamsniffer_status = scamsniffer_response.json().get(
-            "status", "Status not found"
-        )
-
-        # Store the Scam Sniffer result.
-        scamsniffer_results.append((domain_hostname, scamsniffer_status))
-
-        # Check MetaMask for blacklisting.
-        is_phishing = check_metamask_blacklist(domain)
-        metamask_status = "BLOCKED" if is_phishing else "ALLOWED"
-        metamask_results.append((domain_hostname, metamask_status))
-
-        # Check SEAL-ISAC for blacklisting.
-        is_blacklisted = check_seal_isac_blacklist(domain)
-        seal_isac_status = "BLOCKED" if is_blacklisted else "ALLOWED"
-        seal_isac_results.append((domain_hostname, seal_isac_status))
-
-    # Print the results for ChainPatrol.
-    print(f"{GREEN}ChainPatrol Results:{RESET}\n--------------------")
-    for domain_hostname, status in chainpatrol_results:
-        if status == "BLOCKED":
-            status_output = f"{RED}{status}{RESET}"
-        else:
-            status_output = status
-
-        print(f"Domain: {domain_hostname}\nStatus: {status_output}\n")
-
-    # Print the results for Scam Sniffer.
-    print(f"{GREEN}Scam Sniffer Results:{RESET}\n---------------------")
-    for domain_hostname, status in scamsniffer_results:
-        if status == "BLOCKED":
-            status_output = f"{RED}{status}{RESET}"
-        else:
-            status_output = status
-
-        print(f"Domain: {domain_hostname}\nStatus: {status_output}\n")
-
-    # Print the results for MetaMask.
-    print(f"{GREEN}MetaMask Results:{RESET}\n-----------------")
-    for domain_hostname, status in metamask_results:
-        if status == "BLOCKED":
-            status_output = f"{RED}{status}{RESET}"
-        else:
-            status_output = status
-
-        print(f"Domain: {domain_hostname}\nStatus: {status_output}\n")
-
-    # Print the results for SEAL-ISAC.
-    print(f"{GREEN}SEAL-ISAC Results:{RESET}\n------------------")
-    for domain_hostname, status in seal_isac_results:
-        if status == "BLOCKED":
-            status_output = f"{RED}{status}{RESET}"
-        else:
-            status_output = status
-
-        print(f"Domain: {domain_hostname}\nStatus: {status_output}\n")
+    print_results("Blowfish Results", blowfish_results)
+    print_results("ChainPatrol Results", chainpatrol_results)
+    print_results("Scam Sniffer Results", scamsniffer_results)
+    print_results("MetaMask Results", metamask_results)
+    print_results("SEAL-ISAC Results", seal_isac_results)
 
 
 if __name__ == "__main__":
-    main()
+    check()
