@@ -71,7 +71,9 @@ class DomainChecker:
         )
         if parsed.hostname is None:
             raise ValueError(f"Invalid domain: '{domain}'")
-        hostname = parsed.hostname.lower()
+        # The Python function `urlparse` ensures that the hostname is in lower case.
+        # See: https://docs.python.org/3/library/urllib.parse.html#urllib.parse.urlparse.
+        hostname = parsed.hostname
         return f"https://{hostname}" if include_scheme else hostname
 
     def get_headers(
