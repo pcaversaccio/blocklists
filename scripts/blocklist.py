@@ -209,20 +209,26 @@ def print_results(title: str, results: List[DomainCheck]):
     """Prints the results in a consistent format."""
     print(f"{Colours.GREEN}{title}:{Colours.RESET}\n{'-' * (len(title) + 1)}")
     for result in results:
-        if result.status in ["BLOCKED", "ERROR"]:
-            status_output = f"{Colours.RED}{result.status}{Colours.RESET}"
-        else:
-            status_output = result.status
+        status_output = (
+            f"{Colours.RED}{result.status}{Colours.RESET}"
+            if result.status in ["BLOCKED", "ERROR"]
+            else result.status
+        )
 
         print(f"Domain: {result.domain}")
         if result.risk_score is not None:
             # Checks if the risk score is `>= 0.5` and prints in red if true.
             risk_score_output = (
-                f"{Colours.RED}{result.risk_score}{Colours.RESET}"
+                f"{Colours.RED}{str(result.risk_score)}{Colours.RESET}"
                 if result.risk_score >= 0.5
                 else str(result.risk_score)
             )
             print(f"Risk Score: {risk_score_output}")
+            status_output = (
+                f"{Colours.RED}BLOCKED{Colours.RESET}"
+                if result.risk_score >= 0.5
+                else status_output
+            )
         print(f"Status: {status_output}")
         if result.error:
             print(f"Error: {Colours.RED}{result.error}{Colours.RESET}")
