@@ -84,4 +84,4 @@ jobs:
         run: gem install awesome_bot
 
       - name: Validate URLs
-        run: awesome_bot ./*.md scripts/*.py --allow-dupe --allow-redirect --request-delay 0.4 -white-list https://api.blowfish.xyz/v0/domains,https://api.blowfish.xyz/v0/domains
+        run: awesome_bot ./*.md scripts/*.py --allow-dupe --allow-redirect --request-delay 0.4 --white-list https://api.blowfish.xyz/v0/domains,https://api.blowfish.xyz/v0/domains,https://domain1.com
