@@ -178,11 +178,16 @@ class DomainChecker:
                 }
             )
 
-            if observable and any(
-                label["value"] == "trusted web content"
-                for label in observable.get("objectLabel", [])
-            ):
-                return DomainCheck(domain=hostname, status="TRUSTED")
+            if observable:
+                # Please note that the labels `allowlisted domain` and `blocklisted domain`
+                # have been deprecated. See: https://github.com/security-alliance/seal-isac-sdk.js/blob/c349394eb2d82058e90ea634f5a3dd0647fbf6c5/src/web-content/types.ts#L3-L10.
+                labels = {label["value"] for label in observable.get("objectLabel", [])}
+                status = (
+                    "TRUSTED"
+                    if "allowlisted domain" in labels or "trusted web content" in labels
+                    else ("BLOCKED" if "blocklisted domain" in labels else "UNKNOWN")
+                )
+                return DomainCheck(domain=hostname, status=status)
 
             # See https://docs.opencti.io/latest/usage/exploring-observations/#indicators.
             indicator = client.indicator.read(
