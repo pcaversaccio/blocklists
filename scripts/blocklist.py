@@ -170,54 +170,43 @@ class DomainChecker:
             )
 
             # See https://docs.opencti.io/latest/usage/exploring-observations/#observables.
-            observable = client.stix_cyber_observable.read(
-                filters={
-                    "mode": "and",
-                    "filters": [{"key": "value", "values": [hostname]}],
-                    "filterGroups": [],
-                }
-            )
+            observable_filters = {
+                "mode": "and",
+                "filters": [{"key": "value", "values": [hostname]}],
+                "filterGroups": [],
+            }
+            observable = client.stix_cyber_observable.read(filters=observable_filters)
+
+            # Please note that the labels `allowlisted domain` and `blocklisted domain`
+            # have been deprecated. See: https://github.com/security-alliance/seal-isac-sdk.js/blob/c349394eb2d82058e90ea634f5a3dd0647fbf6c5/src/web-content/types.ts#L3-L10.
+            if observable:
+                labels = {label["value"] for label in observable.get("objectLabel", [])}
+                if any(
+                    l in labels for l in ["allowlisted domain", "trusted web content"]
+                ):
+                    return DomainCheck(domain=hostname, status="TRUSTED")
+                if "blocklisted domain" in labels:
+                    return DomainCheck(domain=hostname, status="BLOCKED")
 
             # See https://docs.opencti.io/latest/usage/exploring-observations/#indicators.
-            indicator = client.indicator.read(
-                filters={
-                    "mode": "and",
-                    "filters": [
-                        {
-                            "key": "pattern",
-                            "values": [f"[domain-name:value = '{hostname}']"],
-                        }
-                    ],
-                    "filterGroups": [],
-                }
-            )
-
-            if (
-                observable
-                and indicator
-                and f"[domain-name:value = '{observable.get('value')}']"
-                in indicator.get("pattern", "")
-            ):
-                return DomainCheck(
-                    domain=hostname,
-                    status="UNKNOWN" if indicator.get("revoked", False) else "BLOCKED",
-                )
-
-            if observable:
-                # Please note that the labels `allowlisted domain` and `blocklisted domain`
-                # have been deprecated. See: https://github.com/security-alliance/seal-isac-sdk.js/blob/c349394eb2d82058e90ea634f5a3dd0647fbf6c5/src/web-content/types.ts#L3-L10.
-                labels = {label["value"] for label in observable.get("objectLabel", [])}
-                status = (
-                    "TRUSTED"
-                    if "allowlisted domain" in labels or "trusted web content" in labels
-                    else ("BLOCKED" if "blocklisted domain" in labels else "UNKNOWN")
-                )
-                return DomainCheck(domain=hostname, status=status)
+            indicator_filters = {
+                "mode": "and",
+                "filters": [
+                    {
+                        "key": "pattern",
+                        "values": [f"[domain-name:value = '{hostname}']"],
+                    }
+                ],
+                "filterGroups": [],
+            }
+            indicator = client.indicator.read(filters=indicator_filters)
 
             if indicator:
                 return DomainCheck(
                     domain=hostname,
-                    status="UNKNOWN" if indicator.get("revoked", False) else "BLOCKED",
+                    status=(
+                        "BLOCKED" if not indicator.get("revoked", False) else "UNKNOWN"
+                    ),
                 )
 
             return DomainCheck(domain=hostname, status="UNKNOWN")
