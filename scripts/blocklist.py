@@ -24,8 +24,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Set the root logger's level to "WARNING" to suppress "INFO" logs globally.
 logging.basicConfig(level=logging.WARNING)
-# Set the logging level for `pycti` to "WARNING" to suppress "INFO" logs specifically.
-logging.getLogger("pycti").setLevel(logging.WARNING)
 
 
 class Colours:
@@ -168,41 +166,45 @@ class DomainChecker:
         try:
             hostname = self.normalise_domain(domain)
             client = OpenCTIApiClient(
-                url=APIEndpoints.SEAL_ISAC,
-                token=os.getenv("SEAL_ISAC_API_KEY"),
-                ssl_verify=False,
+                url=APIEndpoints.SEAL_ISAC, token=os.getenv("SEAL_ISAC_API_KEY")
             )
 
-            query = """
-            query DomainObservables($domain: String!) {
-                stixCyberObservables(search: $domain) {
-                    edges {
-                        node {
-                            observable_value
-                            objectLabel {
-                                value
-                            }
-                        }
-                    }
+            # See https://docs.opencti.io/latest/usage/exploring-observations/#observables.
+            observable = client.stix_cyber_observable.read(
+                filters={
+                    "mode": "and",
+                    "filters": [{"key": "value", "values": [hostname]}],
+                    "filterGroups": [],
                 }
-            }
-            """
-
-            result = client.query(query, {"domain": hostname})
-            observables = result["data"]["stixCyberObservables"]["edges"]
-
-            is_blacklisted = any(
-                obs["node"].get("observable_value", "").lower() == hostname
-                # Checks if any observable has "blocklisted domain" as the `objectLabel` value.
-                and any(
-                    label["value"] == "blocklisted domain"
-                    for label in obs["node"].get("objectLabel", [])
-                )
-                for obs in observables
             )
 
-            status = "BLOCKED" if is_blacklisted else "ALLOWED"
-            return DomainCheck(domain=hostname, status=status)
+            if observable and any(
+                label["value"] == "trusted web content"
+                for label in observable.get("objectLabel", [])
+            ):
+                return DomainCheck(domain=hostname, status="TRUSTED")
+
+            # See https://docs.opencti.io/latest/usage/exploring-observations/#indicators.
+            indicator = client.indicator.read(
+                filters={
+                    "mode": "and",
+                    "filters": [
+                        {
+                            "key": "pattern",
+                            "values": [f"[domain-name:value = '{hostname}']"],
+                        }
+                    ],
+                    "filterGroups": [],
+                }
+            )
+
+            if indicator:
+                return DomainCheck(
+                    domain=hostname,
+                    status="UNKNOWN" if indicator.get("revoked", False) else "BLOCKED",
+                )
+
+            return DomainCheck(domain=hostname, status="UNKNOWN")
         except Exception as e:
             return DomainCheck(domain=hostname, status="ERROR", error=str(e))
 
