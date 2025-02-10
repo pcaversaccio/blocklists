@@ -198,7 +198,10 @@ class DomainChecker:
                 and f"[domain-name:value = '{observable.get('value')}']"
                 in indicator.get("pattern", "")
             ):
-                return DomainCheck(domain=hostname, status="BLOCKED")
+                return DomainCheck(
+                    domain=hostname,
+                    status="UNKNOWN" if indicator.get("revoked", False) else "BLOCKED",
+                )
 
             if observable:
                 # Please note that the labels `allowlisted domain` and `blocklisted domain`
