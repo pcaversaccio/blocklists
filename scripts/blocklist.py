@@ -37,7 +37,7 @@ class Colours:
 class APIEndpoints:
     """Sets the API endpoints for the blocklist service providers."""
 
-    BLOWFISH = "https://api.blowfish.xyz/v0/domains"
+    BLOWFISH = "https://tp-api-prod-external.phantom.dev/v0/domains"
     CHAINPATROL = "https://app.chainpatrol.io/api/v2/asset/check"
     SCAMSNIFFER = "https://lookup-api.scamsniffer.io/site/check"
     METAMASK = "https://raw.githubusercontent.com/MetaMask/eth-phishing-detect/refs/heads/main/src/config.json"
