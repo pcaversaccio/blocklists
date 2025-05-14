@@ -1,4 +1,4 @@
-pycti==6.6.9
+pycti==6.6.11
 python-dotenv==1.1.0
 requests==2.32.3
 urllib3==2.4.0
