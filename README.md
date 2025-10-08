@@ -67,4 +67,4 @@ python scripts/blocklist.py --domains "walietconnect.events,www.kyberswap.org,ht
 - [ChainPatrol](https://chainpatrol.io)
 - [Scam Sniffer](https://www.scamsniffer.io)
 - [MetaMask](https://github.com/MetaMask/eth-phishing-detect)
-- [SEAL-ISAC](https://isac.securityalliance.org)
+- [SEAL-ISAC](https://sealisac.org)
