@@ -15,7 +15,6 @@ from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from pycti import OpenCTIApiClient
 
-
 load_dotenv()
 
 
