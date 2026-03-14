@@ -178,7 +178,7 @@ class DomainChecker:
             observable = client.stix_cyber_observable.read(filters=observable_filters)
 
             # Please note that the labels `allowlisted domain` and `blocklisted domain`
-            # have been deprecated. See: https://github.com/security-alliance/seal-isac-sdk.js/blob/c349394eb2d82058e90ea634f5a3dd0647fbf6c5/src/web-content/types.ts#L3-L10.
+            # have been deprecated. See: https://github.com/security-alliance/seal-intel-sdk/blob/3bf98ff5e38e3a2c9b557d35fdd31c8868638d52/src/web-content/types.ts#L4-L11.
             if observable:
                 labels = {label["value"] for label in observable.get("objectLabel", [])}
                 if any(
