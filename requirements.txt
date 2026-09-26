@@ -1,4 +1,4 @@
-pycti==7.260828.0
+pycti==7.260921.0
 python-dotenv==1.2.3
 requests==2.33.1
-urllib3==2.7.0
+urllib3==2.8.0
